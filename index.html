@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>직선 판독기</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #webcam-container {
+            width: 100%;
+            max-width: 400px;
+            margin: 20px auto;
+        }
+        #webcam-container video {
+            width: 100%;
+            border-radius: 10px;
+        }
+        #label-container {
+            margin-top: 20px;
+            font-size: 18px;
+        }
+        #status {
+            margin-top: 20px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>직선 판독기</h1>
+    <div id="webcam-container"></div>
+    <div id="label-container"></div>
+    <div id="status"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    
+    <script>
+        // Teachable Machine 모델 URL (이곳에 실제 모델 URL 삽입)
+        const URL = "https://teachablemachine.withgoogle.com/models/58hdNrBES/";
+        
+        let model, webcam, labelContainer, maxPredictions;
+        
+        async function init() {
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+
+            model = await tmImage.load(modelURL, metadataURL);
+            maxPredictions = model.getTotalClasses();
+
+            const flip = true;
+            webcam = new tmImage.Webcam(400, 300, flip);
+            await webcam.setup();
+            await webcam.play();
+            window.requestAnimationFrame(loop);
+
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+            
+            labelContainer = document.getElementById("label-container");
+            for (let i = 0; i < maxPredictions; i++) {
+                labelContainer.appendChild(document.createElement("div"));
+            }
+        }
+
+        async function loop() {
+            webcam.update();
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        async function predict() {
+            const prediction = await model.predict(webcam.canvas);
+            const statusElement = document.getElementById("status");
+
+            for (let i = 0; i < maxPredictions; i++) {
+                const classPrediction = prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+                labelContainer.childNodes[i].innerHTML = classPrediction;
+
+                if (prediction[i].probability > 0.7) {
+                    if (prediction[i].className === "직선") {
+                        statusElement.innerHTML = "직선입니다.";
+                        speak("길을 건너지 마세요.");
+                    } else if (prediction[i].className === "직선 아님") {
+                        statusElement.innerHTML = "직선이 아닙니다.";
+                        speak("길을 건너가세요.");
+                    }
+                } else {
+                    statusElement.innerHTML = "신호를 인식하는 중...";
+                }
+            }
+        }
+
+        function speak(text) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'ko-KR';
+            window.speechSynthesis.speak(utterance);
+        }
+
+        init();
+    </script>
+</body>
+</html>
